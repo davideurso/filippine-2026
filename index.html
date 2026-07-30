@@ -28,15 +28,33 @@ const regionalPhotos={
   delhi:{url:"https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/India_Gate_in_New_Delhi_at_Night.jpg/1000px-India_Gate_in_New_Delhi_at_Night.jpg",alt:"Delhi",credit:"https://commons.wikimedia.org/wiki/Special:MediaSearch?type=image&search=Delhi%20India%20Gate",label:"Foto rappresentativa di Delhi"}
 };
 function regionFor(name,p={}){const n=(name||'').toLowerCase();if(n.includes('milano')||n.includes('malpensa'))return 'milano';if(n.includes('delhi')||n.includes('indira gandhi'))return 'delhi';if(n.includes('manila')||n.includes('ninoy')||n.includes('golden phoenix')||n.includes('clark'))return 'manila';if(n.includes('coron')||n.includes('kayangan')||n.includes('francisco b. reyes'))return 'coron';if(n.includes('el nido')||n.includes('nacpan')||n.includes('matinloc')||n.includes('big lagoon')||n.includes('hidden beach'))return 'elnido';if(n.includes('bohol')||n.includes('panglao')||n.includes('balicasag')||n.includes('chocolate'))return 'bohol';if(n.includes('oslob')||n.includes('tumalog')||n.includes('sumilon')||n.includes('inambakan'))return 'oslob';if(n.includes('siquijor')||n.includes('cambugahay'))return 'siquijor';if(n.includes('dumaguete'))return 'dumaguete';if((p.lat||0)>11.3&&(p.lat||0)<12.5)return 'coron';if((p.lat||0)>10.7&&(p.lat||0)<11.5)return 'elnido';if((p.lat||0)>9.3&&(p.lat||0)<10.3&&(p.lon||0)>123.6)return 'bohol';if((p.lat||0)>8.8&&(p.lat||0)<9.5)return 'siquijor';return 'manila';}
+function photoKeywords(name,p={}){
+  const n=(name||'').toLowerCase();
+  const specific=[
+    ['intramuros','intramuros,manila,philippines'],['rizal','rizal,park,manila'],['musei nazionali','national,museum,manila'],
+    ['kayangan','kayangan,lake,coron'],['malcapuya','malcapuya,island,coron'],['banana e bulog','bulog,dos,coron'],
+    ['laghi, lagune','coron,palawan,lagoon'],['coron','coron,palawan,philippines'],
+    ['hidden beach','hidden,beach,el,nido'],['big lagoon','big,lagoon,el,nido'],['nacpan','nacpan,beach,el,nido'],['el nido','el,nido,palawan'],
+    ['chocolate hills','chocolate,hills,bohol'],['delfini','balicasag,island,bohol'],['panglao','panglao,bohol,beach'],['bohol','bohol,philippines'],
+    ['tumalog','tumalog,falls,oslob'],['sumilon','sumilon,island,cebu'],['inambakan','inambakan,falls,cebu'],['oslob','oslob,cebu,whale,shark'],
+    ['cambugahay','cambugahay,falls,siquijor'],['snorkeling e spiagge','siquijor,beach,snorkeling'],['siquijor','siquijor,philippines'],
+    ['dumaguete','dumaguete,philippines'],['moalboal','moalboal,cebu'],['manila','manila,philippines'],
+    ['clark','clark,airport,philippines'],['francisco b. reyes','busuanga,airport,coron'],['panglao international','bohol,panglao,airport'],
+    ['el nido airport','el,nido,airport'],['ninoy aquino','manila,airport'],['malpensa','milan,airport'],['indira gandhi','delhi,airport'],
+    ['porto coron','coron,port,philippines'],['ferry terminal','el,nido,port'],['port of dumaguete','dumaguete,port']
+  ];
+  for(const [key,q] of specific){if(n.includes(key))return q;}
+  return `${encodeURIComponent(name||'Philippines')},philippines`;
+}
+function stableLock(name){let h=2166136261;for(const ch of name){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return Math.abs(h>>>0)%100000;}
 function photoHtml(name,p){
-  const exact=photos[name];
-  const regional=regionalPhotos[regionFor(name,p)] || regionalPhotos.manila;
-  const universal={url:"https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=80",alt:"Spiaggia tropicale al tramonto",credit:"https://unsplash.com/photos/body-of-water-near-trees-during-daytime-b723cf961d3e",label:"Foto tropicale di riserva"};
-  const candidates=[exact,regional,universal].filter(Boolean);
-  const urls=[...new Set(candidates.map(x=>x.url))];if(!urls.includes(universal.url))urls.push(universal.url);
-  const first=candidates[0];
-  const caption=exact?'Foto del luogo':(first.label||'Foto rappresentativa della zona');
-  return `<img class="popup-photo" src="${first.url}" data-sources='${JSON.stringify(urls)}' data-index="0" alt="${first.alt||name}" loading="eager" referrerpolicy="no-referrer"><div class="photo-fallback">Foto non disponibile</div><div class="photo-credit">${caption}: <a href="${first.credit}" target="_blank" rel="noopener">Wikimedia Commons</a></div>`;
+  if(p && p.category==='hotel') return '';
+  const query=photoKeywords(name,p);
+  const lock=stableLock(name);
+  const primary=`https://loremflickr.com/900/600/${query}?lock=${lock}`;
+  const secondary=`https://loremflickr.com/900/600/philippines,travel?lock=${lock+100003}`;
+  const sources=[primary,secondary];
+  return `<img class="popup-photo" src="${primary}" data-sources='${JSON.stringify(sources)}' data-index="0" alt="${name}" loading="eager"><div class="photo-fallback">Foto non disponibile</div><div class="photo-credit">Foto tematica del luogo: <a href="https://www.flickr.com/search/?text=${encodeURIComponent(name+' Philippines')}" target="_blank" rel="noopener">ricerca Flickr</a></div>`;
 }
 document.addEventListener('error',e=>{
   const img=e.target;
@@ -44,17 +62,10 @@ document.addEventListener('error',e=>{
   let sources=[];
   try{sources=JSON.parse(img.dataset.sources||'[]')}catch(_){sources=[]}
   const next=Number(img.dataset.index||0)+1;
-  if(next<sources.length){
-    img.dataset.index=String(next);
-    img.src=sources[next];
-    return;
-  }
+  if(next<sources.length){img.dataset.index=String(next);img.src=sources[next];return;}
   img.style.display='none';
   const fallback=img.nextElementSibling;
-  if(fallback && fallback.classList.contains('photo-fallback')){
-    fallback.style.display='block';
-    fallback.textContent='Foto temporaneamente non disponibile';
-  }
+  if(fallback && fallback.classList.contains('photo-fallback')){fallback.style.display='block';fallback.textContent='Foto temporaneamente non disponibile';}
 },true);
 const map=L.map('map',{worldCopyJump:true}).setView([12.3,122.0],6);
 const baseLayers={classic:L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:20,attribution:'© OpenStreetMap contributors © CARTO'}),satellite:L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles © Esri'})};let activeBaseLayer=baseLayers.classic.addTo(map);function setBaseLayer(style){const next=baseLayers[style]||baseLayers.classic;if(next!==activeBaseLayer){map.removeLayer(activeBaseLayer);next.addTo(map);next.bringToBack();activeBaseLayer=next;}}
