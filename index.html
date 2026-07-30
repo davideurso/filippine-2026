@@ -31,12 +31,12 @@ function regionFor(name,p={}){const n=(name||'').toLowerCase();if(n.includes('mi
 function photoHtml(name,p){
   const exact=photos[name];
   const regional=regionalPhotos[regionFor(name,p)] || regionalPhotos.manila;
-  const universal={url:"https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/Malcapuya_Island,_Palawan,_Philippines.jpg/900px-Malcapuya_Island,_Palawan,_Philippines.jpg",alt:"Paesaggio tropicale delle Filippine",credit:"https://commons.wikimedia.org/wiki/File:Malcapuya_Island,_Palawan,_Philippines.jpg",label:"Foto rappresentativa delle Filippine"};
+  const universal={url:"https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=80",alt:"Spiaggia tropicale al tramonto",credit:"https://unsplash.com/photos/body-of-water-near-trees-during-daytime-b723cf961d3e",label:"Foto tropicale di riserva"};
   const candidates=[exact,regional,universal].filter(Boolean);
   const urls=[...new Set(candidates.map(x=>x.url))];if(!urls.includes(universal.url))urls.push(universal.url);
   const first=candidates[0];
   const caption=exact?'Foto del luogo':(first.label||'Foto rappresentativa della zona');
-  return `<img class="popup-photo" src="${first.url}" data-sources='${JSON.stringify(urls)}' data-index="0" alt="${first.alt||name}" loading="lazy"><div class="photo-fallback">Foto non disponibile</div><div class="photo-credit">${caption}: <a href="${first.credit}" target="_blank" rel="noopener">Wikimedia Commons</a></div>`;
+  return `<img class="popup-photo" src="${first.url}" data-sources='${JSON.stringify(urls)}' data-index="0" alt="${first.alt||name}" loading="eager" referrerpolicy="no-referrer"><div class="photo-fallback">Foto non disponibile</div><div class="photo-credit">${caption}: <a href="${first.credit}" target="_blank" rel="noopener">Wikimedia Commons</a></div>`;
 }
 document.addEventListener('error',e=>{
   const img=e.target;
@@ -44,8 +44,17 @@ document.addEventListener('error',e=>{
   let sources=[];
   try{sources=JSON.parse(img.dataset.sources||'[]')}catch(_){sources=[]}
   const next=Number(img.dataset.index||0)+1;
-  if(next<sources.length){img.dataset.index=String(next);img.src=sources[next];}
-  else{img.dataset.index='0';img.src=sources[sources.length-1]+'?v=stable';}
+  if(next<sources.length){
+    img.dataset.index=String(next);
+    img.src=sources[next];
+    return;
+  }
+  img.style.display='none';
+  const fallback=img.nextElementSibling;
+  if(fallback && fallback.classList.contains('photo-fallback')){
+    fallback.style.display='block';
+    fallback.textContent='Foto temporaneamente non disponibile';
+  }
 },true);
 const map=L.map('map',{worldCopyJump:true}).setView([12.3,122.0],6);
 const baseLayers={classic:L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:20,attribution:'© OpenStreetMap contributors © CARTO'}),satellite:L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles © Esri'})};let activeBaseLayer=baseLayers.classic.addTo(map);function setBaseLayer(style){const next=baseLayers[style]||baseLayers.classic;if(next!==activeBaseLayer){map.removeLayer(activeBaseLayer);next.addTo(map);next.bringToBack();activeBaseLayer=next;}}
